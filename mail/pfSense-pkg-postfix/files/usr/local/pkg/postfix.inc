@@ -286,7 +286,7 @@ function sync_package_postfix($via_rpc = "no") {
 	}
 	#check relay recipients
 	$all_relay_recipients = sync_relay_recipients('gui');
-
+	$dkim_config=check_dkim_config();
 	$copyright = <<<ABOUT
 #Part of the Postfix package for pfSense
 #Copyright (C) 2010 Erik Fonnesbeck
