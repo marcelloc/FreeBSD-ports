@@ -39,6 +39,7 @@ require_once("services.inc");
 require_once("util.inc");
 require_once("xmlrpc.inc");
 require_once("xmlrpc_client.inc");
+require_once("postfix_dkim.inc");
 
 define('POSTFIX_LOCALBASE','/usr/local');
 
