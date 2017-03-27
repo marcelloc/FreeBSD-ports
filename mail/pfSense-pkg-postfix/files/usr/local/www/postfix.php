@@ -2,7 +2,7 @@
 /*
 	postfix.php
 	part of pfSense (https://www.pfSense.org/)
-	Copyright (C) 2011-2015 Marcello Coutinho <marcellocoutinho@gmail.com>
+	Copyright (C) 2011-2017 Marcello Coutinho <marcellocoutinho@gmail.com>
 	Copyright (C) 2015 ESF, LLC
 	All rights reserved.
 
@@ -110,7 +110,7 @@ function get_remote_log() {
 										if ($debug) {
 											print $update['day'] . " writing from remote system to db...";
 										}
-										$dbhandle = sqlite_open($postfix_dir . '/' . $update['day'] . ".db", 0666, $error);
+										$dbhandle = new SQLite3($postfix_dir . '/' . $update['day'] . ".db");
 										//file_put_contents("/tmp/" . $key . '-' . $update['day'] . ".sql", gzuncompress(base64_decode($update['sql'])), LOCK_EX);
 										$ok = sqlite_exec($dbhandle, gzuncompress(base64_decode($update['sql'])), $error);
 										if (!$ok) {
@@ -360,7 +360,7 @@ function write_db($stm, $table, $days) {
 			if ($debug) {
 				print "writing to local db $day...";
 			}
-			$dbhandle = sqlite_open($postfix_dir.$day.".db", 0666, $error);
+			$dbhandle = new SQLite3($postfix_dir.$day.".db");
 			if (!$dbhandle) {
 				die ($error);
 			}
@@ -371,7 +371,7 @@ function write_db($stm, $table, $days) {
 			} elseif ($debug) {
 				print "ok\n";
 			}
-			sqlite_close($dbhandle);
+			$dbhandle->close();
 		}
 	}
 	/* Write updated sql files */
@@ -473,10 +473,10 @@ CREATE INDEX "to_too" on mail_to (too ASC);
 EOF;
 #test file version
 print "checking". $postfix_dir.$postfix_db."\n";
-$dbhandle = sqlite_open($postfix_dir.$postfix_db, 0666, $error);
+$dbhandle = new SQLite3($postfix_dir.$postfix_db);
 if (!$dbhandle) die ($error);
 $ok = sqlite_exec($dbhandle,"select value from db_version", $error);
-sqlite_close($dbhandle);
+$dbhandle->close();
 if (!$ok){
 	print "delete previous table version\n";
 	if (file_exists($postfix_dir.$postfix_db))
@@ -484,14 +484,14 @@ if (!$ok){
 	$new_db=0;
 }
 if ($new_db==0){
-	$dbhandle = sqlite_open($postfix_dir.$postfix_db, 0666, $error);
+	$dbhandle = new SQLite3($postfix_dir.$postfix_db);
 	$ok = sqlite_exec($dbhandle, $stm, $error);
 	if (!$ok)
 		print ("Cannot execute query. $error\n");
 	$ok = sqlite_exec($dbhandle, $stm2, $error);
 	if (!$ok)
 		print ("Cannot execute query. $error\n");
-	sqlite_close($dbhandle);
+	$dbhandle->close();
 	}
 }
 
@@ -542,8 +542,9 @@ get_remote_log();
 grep_log();
 }
 
-#http client call
+// http client call
 if ($_REQUEST['files']!= ""){
+	//var_dump($_REQUEST);
 	#do search
 	if($_REQUEST['queue']=="QUEUE"){
 		$stm="select * from mail_from, mail_to ,mail_status where mail_from.id=mail_to.from_id and mail_to.status=mail_status.id ";
@@ -560,7 +561,7 @@ if ($_REQUEST['files']!= ""){
 	$total_result=0;
 	foreach ($files as $postfix_db)
 		if (file_exists($postfix_dir.'/'.$postfix_db)){
-			$dbhandle = sqlite_open($postfix_dir.'/'.$postfix_db, 0666, $error);
+			$dbhandle = new SQLite3($postfix_dir.'/'.$postfix_db);
 			if ($_REQUEST['from']!= ""){
 				$next=($last_next==" and "?" and ":" where ");
 				$last_next=" and ";
@@ -622,149 +623,142 @@ if ($_REQUEST['files']!= ""){
 				}
 					#print "<pre>".$stm;
 				#$stm = "select * from mail_to,mail_status where mail_to.status=mail_status.id";
-				$result = sqlite_query($dbhandle, $stm." order by date desc $limit_prefix $limit ");
+				$result= $dbhandle->query($stm . " order by date desc $limit_prefix $limit ");
+				//var_dump($result);
+				//$result = sqlite_query($dbhandle, $stm." order by date desc $limit_prefix $limit ");
 				#$result = sqlite_query($dbhandle, $stm."  $limit_prefix $limit ");
+			#print "<PRE>";
+			#var_dump( $stm);
 			if (preg_match("/\d+/",$_REQUEST['limit'])){
 				for ($i = 1; $i <= $limit; $i++) {
-					$row = sqlite_fetch_array($result, SQLITE_ASSOC);
-					 if (is_array($row))
+					$row= $result->fetchArray(SQLITE3_ASSOC);
+					//var_dump($row);
+					//old///$row = sqlite_fetch_array($result, SQLITE_ASSOC);
+					if (is_array($row))
 						$stm_fetch[]=$row;
 					}
 			}
 			else{
 				$stm_fetch = sqlite_fetch_all($result, SQLITE_ASSOC);
 			}
-			sqlite_close($dbhandle);
+			//var_dump($stm_fetch);
+			$dbhandle->close();
 	}
 	$fields= explode(",", $_REQUEST['fields']);
-	if ($_REQUEST['sbutton']=='export'){
-		print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		print '<tr><td colspan="'.count($fields).'" valign="top" class="listtopic">'.gettext("Search Results").'</td></tr>';
-		print '<tr>';
-		$header="";
-		foreach ($stm_fetch as $mail){
-			foreach ($mail as $key => $data){
-				if (!preg_match("/$key/",$header))
-					$header .= $key.",";
-				$export.=preg_replace('/,/',"",$mail[$key]).",";
-				}
-			$export.= "\n";
-		}
-		print '<td class="tabcont"><textarea id="varnishlogs" rows="50" cols="100%">';
-		print "This export is in csv format, paste it without this line on any software that handles csv files.\n\n".$header."\n".$export;
-		print "</textarea></td></tr></table>";
-		}
-	else{
+		//to see examples, and select datatable modules to download see
+		// https://datatables.net/download/
+		?>
+                <link rel="stylesheet" href="/vendor/datatable/css/jquery.dataTables.min.css">
+		<link rel="stylesheet" href="/vendor/datatable/Buttons-1.2.4/css/buttons.dataTables.min.css">
+                <script src="/vendor/jquery/jquery-1.12.0.min.js" type="text/javascript"></script>
+                <script src="/vendor/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/js/jquery.dataTables.min.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/Buttons-1.2.4/js/dataTables.buttons.min.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/JSZip-2.5.0/jszip.min.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/pdfmake-0.1.18/build/pdfmake.min.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/pdfmake-0.1.18/build/vfs_fonts.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/Buttons-1.2.4/js/buttons.html5.min.js" type="text/javascript"></script>
+		<script src="/vendor/datatable/ColReorder-1.3.2/js/dataTables.colReorder.min.js" type="text/javascript"></script>
+		
+		<br/>
+                <?php
+
 	if ($_REQUEST['queue']=="NOQUEUE"){
-		print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		print '<tr><td colspan="'.count($fields).'" valign="top" class="listtopic">'.gettext("Search Results").'</td></tr>';
-		print '<tr>';
-		if(in_array("date",$fields))
-			print '<td class="listlr"><strong>date</strong></td>';
-		if(in_array("server",$fields))
-			print '<td class="listlr"><strong>server</strong></td>';
-		if(in_array("from",$fields))
-			print '<td class="listlr"><strong>From</strong></td>';
-		if(in_array("to",$fields))
-			print '<td class="listlr"><strong>to</strong></td>';
-		if(in_array("helo",$fields))
-			print '<td class="listlr"><strong>Helo</strong></td>';
-		if(in_array("status",$fields))
-			print '<td class="listlr"><strong>Status</strong></td>';
-		if(in_array("status_info",$fields))
-			print '<td class="listlr"><strong>Status Info</strong></td>';
-		print '</tr>';
-		foreach ($stm_fetch as $mail){
-			print '<tr>';
-		if(in_array("date",$fields))
-			print '<td class="listlr">'.$mail['date'].'</td>';
-		if(in_array("server",$fields))
-			print '<td class="listlr">'.$mail['server'].'</td>';
-		if(in_array("from",$fields))
-			print '<td class="listlr">'.$mail['fromm'].'</td>';
-		if(in_array("to",$fields))
-			print '<td class="listlr">'.$mail['too'].'</td>';
-		if(in_array("helo",$fields))
-			print '<td class="listlr">'.$mail['helo'].'</td>';
-		if(in_array("status",$fields))
-			print '<td class="listlr">'.$mail['status'].'</td>';
-		if(in_array("status_info",$fields))
-			print '<td class="listlr">'.$mail['status_info'].'</td>';
-			print '</tr>';
-			$total_result++;
+		print '<table id="dtresult" class="display" width="98%" border="0" cellpadding="8" cellspacing="0">';
+		$tss=array('thead','tfoot');
+		$dbc=array('date','server','from','to','helo','status','status_info');
+		foreach ($tss as $t){
+			$$t = "<" . $t . "><tr>\n";
+			foreach ($dbc as $c){
+			   if(in_array($c,$fields))
+				$$t .= "<th>".ucfirst($c)."</th>";
+			}
+			$$t .= "</tr></" . $t . ">";
 		}
+		print "{$thead}\n<tbody>\n";
+		foreach ($stm_fetch as $mail){
+			print "\n<tr>";
+			foreach ($dbc as $c){
+                           if(in_array($c,$fields))
+				switch($c){
+				case 'from':
+					print  "<th>{$mail['fromm']}</th>\n";
+					break;
+				case 'to':
+					print  "<th>{$mail['too']}</th>\n";
+                                        break;
+				default:
+                                	print  "<th>{$mail[$c]}</th>\n";
+					break;
+				}
+                        }
+			print "</tr>\n";
+		}
+		print "</tbody>\n{$tfoot}\n</table>";
 	}
   else{
-  		print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		print '<tr><td colspan="'.count($fields).'" valign="top" class="listtopic">'.gettext("Search Results").'</td></tr>';
-		print '<tr>';
-		if(in_array("date",$fields))
-			print '<td class="listlr" ><strong>Date</strong></td>';
-		if(in_array("server",$fields))
-			print '<td class="listlr" ><strong>Server</strong></td>';
-		if(in_array("from",$fields))
-			print '<td class="listlr" ><strong>From</strong></td>';
-		if(in_array("to",$fields))
-			print '<td class="listlr" ><strong>to</strong></td>';
-		if(in_array("subject",$fields))
-			print '<td class="listlr" ><strong>Subject</strong></td>';
-		if(in_array("delay",$fields))
-			print '<td class="listlr" ><strong>Delay</strong></td>';
-		if(in_array("status",$fields))
-			print '<td class="listlr" ><strong>Status</strong></td>';
-		if(in_array("status_info",$fields))
-			print '<td class="listlr" ><strong>Status Info</strong></td>';
-		if(in_array("size",$fields))
-			print '<td class="listlr" ><strong>Size</strong></td>';
-		if(in_array("helo",$fields))
-			print '<td class="listlr" ><strong>Helo</strong></td>';
-		if(in_array("sid",$fields))
-			print '<td class="listlr" ><strong>SID</strong></td>';
-		if(in_array("msgid",$fields))
-			print '<td class="listlr" ><strong>MSGID</strong></td>';
-		if(in_array("bounce",$fields))
-			print '<td class="listlr" ><strong>Bounce</strong></td>';
-		if(in_array("relay",$fields))
-			print '<td class="listlr" ><strong>Relay</strong></td>';
-		print '</tr>';
-		foreach ($stm_fetch as $mail){
-			if(in_array("date",$fields))
-				print '<td class="listlr">'.$mail['mail_from.date'].'</td>';
-			if(in_array("server",$fields))
-				print '<td class="listlr">'.$mail['mail_from.server'].'</td>';
-			if(in_array("from",$fields))
-				print '<td class="listlr">'.$mail['mail_from.fromm'].'</td>';
-			if(in_array("to",$fields))
-				print '<td class="listlr">'.$mail['mail_to.too'].'</td>';
-			if(in_array("subject",$fields))
-				print '<td class="listlr">'.$mail['mail_from.subject'].'</td>';
-			if(in_array("delay",$fields))
-				print '<td class="listlr">'.$mail['mail_to.delay'].'</td>';
-			if(in_array("status",$fields))
-				print '<td class="listlr">'.$mail['mail_status.info'].'</td>';
-			if(in_array("status_info",$fields))
-				print '<td class="listlr">'.$mail['mail_to.status_info'].'</td>';
-			if(in_array("size",$fields))
-				print '<td class="listlr">'.$mail['mail_from.size'].'</td>';
-			if(in_array("helo",$fields))
-				print '<td class="listlr">'.$mail['mail_from.helo'].'</td>';
-			if(in_array("sid",$fields))
-				print '<td class="listlr">'.$mail['mail_from.sid'].'</td>';
-			if(in_array("msgid",$fields))
-				print '<td class="listlr">'.$mail['mail_from.msgid'].'</td>';
-			if(in_array("bounce",$fields))
-				print '<td class="listlr">'.$mail['mail_to.bounce'].'</td>';
-			if(in_array("relay",$fields))
-				print '<td class="listlr">'.$mail['mail_to.relay'].'</td>';
-			print '</tr>';
-			$total_result++;
+  		print '<table id="dtresult" class="display" width="90%" border="0" cellpadding="8" cellspacing="0">';
+		$tss=array('thead','tfoot');
+		$dbc=array('date','server','from','to','subject','delay','helo','status','status_info','size','sid',',msgid','bounce','relay');
+                foreach ($tss as $t){
+		$$t = "<" . $t . "><tr>\n";
+		foreach ($dbc as $c){
+                	if(in_array($c,$fields))
+                        	$$t .= "<th>".ucfirst($c)."</th>";
+                        }
+		$$t .= "</tr></" . $t . ">";
 		}
+		print "{$thead}\n<tbody>\n";
+		foreach ($stm_fetch as $mail){
+                        print "\n<tr>";
+                        foreach ($dbc as $c){
+                           if(in_array($c,$fields))
+				switch($c){
+                                case 'from':
+                                        print  "<th>{$mail['fromm']}</th>\n";
+                                        break;
+				case 'status':
+                                        print  "<th>{$mail['info']}</th>\n";
+                                        break;
+                                case 'to':
+                                        print  "<th>{$mail['too']}</th>\n";
+                                        break;
+				case 'subject':
+					print '<th>'. mb_decode_mimeheader($mail['subject']).'</th>';
+					break;
+				default:
+                                	print  "<th>{$mail[$c]}</th>\n";
+					break;
+				}
+                        }
+                        print "</tr>\n";
+                }
+		print "</tbody>\n{$tfoot}\n</table>";
   }
-	print '<tr>';
-	print '<td ><strong>Total:</strong></td>';
-	print '<td ><strong>'.$total_result.'</strong></td>';
-	print '</tr>';
-	print '</table>';
-	}
+	print <<<EOF
+<script>
+$(document).ready(function() {
+    $('#dtresult').DataTable({
+	scrollY:        '50vh',
+	scrollCollapse: true,
+	dom: 'Bfrtip',
+	colReorder: {
+            realtime: false
+        },
+        buttons: [
+            {
+                extend: 'copyHtml5',
+                exportOptions: {
+                 columns: ':contains("Office")'
+                }
+            },
+            'excelHtml5',
+            'csvHtml5',
+            'pdfHtml5'
+        ]
+	});
+} );
+</script>
+EOF;
 }
 ?>
