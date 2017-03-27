@@ -2,7 +2,7 @@
 /*
  * postfix_about.php
  *
- * part of pfSense (https://www.pfsense.org)
+ * 
  * Copyright (c) 2011-2017 Marcello Coutinho
  * All rights reserved.
  *
