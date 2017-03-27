@@ -295,7 +295,13 @@
                                 </options>
                         <description>Selects the action to be taken when a message arrives unsigned.</description>
                 </field>
-
+                <field>
+                        <fielddescr>Except Domains</fielddescr>
+                        <fieldname>except_domains</fieldname>
+                        <description><![CDATA[Except domains to do not verify DKIM (use comma to separate domains)]]></description>
+                        <type>input</type>
+                        <size>80</size>
+                </field>
 		<field>
 			<name><![CDATA[Third part Antispam Settings ]]></name>
 			<type>listtopic</type>
