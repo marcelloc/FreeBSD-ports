@@ -5,37 +5,25 @@
 	<copyright>
 	<![CDATA[
 /* $Id$ */
-/* ========================================================================== */
 /*
-    postfix_antispam.xml
-    part of the Postfix package for pfSense
-    Copyright (C) 2011-2015 Marcello Coutinho
-
-    All rights reserved.            
-			                                                                  */
-/* ========================================================================== */
-/*
-    Redistribution and use in source and binary forms, with or without
-    modification, are permitted provided that the following conditions are met:
-
-     1. Redistributions of source code must retain the above copyright notice,
-        this list of conditions and the following disclaimer.
-
-     2. Redistributions in binary form must reproduce the above copyright
-        notice, this list of conditions and the following disclaimer in the
-        documentation and/or other materials provided with the distribution.
-
-    THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
-    INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-    AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-    AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
-    OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-    SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-    INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-    CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-    ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-    POSSIBILITY OF SUCH DAMAGE.
-                                                                              */
+ * postfix_antispam.xml
+ *
+ * 
+ * Copyright (c) 2011-2017 Marcello Coutinho
+ * All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 /* ========================================================================== */
 	]]>
 	</copyright>
@@ -215,19 +203,99 @@
 				</options>
 		</field>
 		<field>
-			<fielddescr>SPF lookup</fielddescr>
+			<fielddescr>SPF lookup HELO</fielddescr>
 			<fieldname>postfix_spf</fieldname>
-			<type>select</type>
- 				<options>
-				<option><name>REJECT the mail when the sender credentials FAILS</name><value>reject_spf_invalid_sender</value></option>
-				<option><name>PERMIT the mail when the sender credentials SUCCEED</name><value>permit_spf_valid_sender</value></option>
-				<option><name>Just show in header that the mail failed the test</name><value>spf_mark_only</value></option>
-				<option><name>Do not check SPF records</name><value>disable</value></option>
-				</options>
+                        <type>select</type>
+                                <options>
+                                <option><name>SPF_Not_Pass (default) - Reject if HELO results in not Pass, None, or Temperror</name><value>SPF_Not_Pass</value></option>
+                                <option><name>SoftFail - Reject on HELO Softfail or Fail.</name><value>Softfail</value></option>
+                                <option><name>Fail - Reject only on HELO Fail.</name><value>Fail</value></option>
+                                <option><name>Null - Only reject HELO Fail for Null sender (SPF Classic)</name><value>Fail</value></option>
+                                <option><name>False - Never reject on HELO, append header only</name><value>False</value></option>
+                                <option><name>No_Check - Do not check SPF records</name><value>No_Check</value></option>
+                                </options>
 			<description>
-			<![CDATA[<strong>Default: REJECT the mail when the sender credentials FAILS</strong><br><a target=_new href='http://www.openspf.org/Introduction'>The Sender Policy Framework (SPF) is an open standard specifying a technical method to prevent sender address forgery.</a>]]>
+			<![CDATA[<strong>Default: Reject if result not Pass, None, or Temperror</strong><br><a target=_new href='http://www.openspf.org/Introduction'>The Sender Policy Framework (SPF) is an open standard specifying a technical method to prevent sender address forgery.</a>]]>
 			</description>
 		</field>
+                <field>
+                        <fielddescr>SPF lookup Mail From</fielddescr>
+                        <fieldname>postfix_spf_mail</fieldname>
+                        <type>select</type>
+                                <options>
+                                <option><name>SPF_Not_Pass (default) - Reject if Mail From results in not Pass, None, or Temperror</name><value>SPF_Not_Pass</value></option>
+                                <option><name>SoftFail - Reject on Mail From Softfail or Fail.</name><value>Softfail</value></option>
+                                <option><name>Fail - Reject only on Mail From Fail.</name><value>Fail</value></option>
+                                <option><name>Null - Only reject Mail From Fail for Null sender (SPF Classic)</name><value>Fail</value></option>
+                                <option><name>False - Never reject on Mail From, append header only</name><value>False</value></option>
+                                <option><name>No_Check - Do not check SPF records</name><value>No_Check</value></option>
+                                </options>
+                        <description>
+                        <![CDATA[<strong>Default: Reject if result not Pass, None, or Temperror</strong><br><a target=_new href='http://www.openspf.org/Introduction'>The Sender Policy Framework (SPF) is an open standard specifying a technical method to prevent sender address forgery.</a>]]>
+                        </description>
+                </field>
+
+                <field>
+                        <fielddescr>SPF Debug level</fielddescr>
+                        <fieldname>postfix_spf_debug</fieldname>
+                        <type>select</type>
+                                <options>
+                                <option><name>1 (Default)</name><value>1</value></option>
+                                <option><name>2</name><value>2</value></option>
+                                <option><name>3</name><value>3</value></option>
+                                <option><name>4</name><value>4</value></option>
+                                </options>
+                        <description>Select SPF debug level on mail log.</description>
+                </field>
+                <field>
+                        <name><![CDATA[Domain keys]]></name>
+                        <type>listtopic</type>
+                </field>
+                <field>
+                        <fielddescr>DKIM key lookup</fielddescr>
+                        <fieldname>check_dkim</fieldname>
+                        <type>checkbox</type>
+                        <description>
+                        <![CDATA[<strong>Default: Unchecked (Do not check for DKIM keys)</strong><br>]]>
+                        </description>
+                </field>
+                 <field>
+                        <fielddescr>On Bad signature</fielddescr>
+                        <fieldname>on_badsignature</fieldname>
+                        <type>select</type>
+                                <options>
+                                <option><name>Accept the message (Default)</name><value>a</value></option>
+                                <option><name>Discard the message</name><value>d</value></option>
+                                <option><name>Reject the message</name><value>r</value></option>
+                                <option><name>Temp-fail the message</name><value>t</value></option>
+                                </options>
+                        <description>Selects the action to be taken when a signature fails to validate.</description>
+                </field>
+                <field>
+                        <fielddescr>On Key not found</fielddescr>
+                        <fieldname>on_keynotfound</fieldname>
+                        <type>select</type>
+                                <options>
+                                <option><name>Accept the message (Default)</name><value>a</value></option>
+                                <option><name>Discard the message</name><value>d</value></option>
+                                <option><name>Reject the message</name><value>r</value></option>
+                                <option><name>Temp-fail the message</name><value>t</value></option>
+                                </options>
+                        <description>Selects the action to be taken when the key referenced by a signature is not present in the DNS.</description>
+                </field>
+                <field>
+                        <fielddescr>On No signature</fielddescr>
+                        <fieldname>on_nosignature</fieldname>
+                        <type>select</type>
+                                <options>
+                                <option><name>Accept the message (Default)</name><value>a</value></option>
+                                <option><name>Discard the message</name><value>d</value></option>
+                                <option><name>Reject the message</name><value>r</value></option>
+                                <option><name>Temp-fail the message</name><value>t</value></option>
+                                </options>
+                        <description>Selects the action to be taken when a message arrives unsigned.</description>
+                </field>
+
 		<field>
 			<name><![CDATA[Third part Antispam Settings ]]></name>
 			<type>listtopic</type>
