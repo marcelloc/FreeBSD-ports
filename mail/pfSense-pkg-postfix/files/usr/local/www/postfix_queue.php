@@ -1,125 +1,169 @@
 <?php
 /*
-	postfix_view_config.php
-	part of pfSense (https://www.pfsense.org/)
-	Copyright (C) 2011-2015 Marcello Coutinho <marcellocoutinho@gmail.com>
-	based on varnish_view_config.
-	All rights reserved.
+ * postfix_queue.php
+ *
+ * part of pfSense (https://www.pfsense.org)
+ * Copyright (c) 2011-2017 Marcello Coutinho
+ * All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+require_once("/etc/inc/util.inc");
+require_once("/etc/inc/functions.inc");
+require_once("/etc/inc/pkg-utils.inc");
+require_once("/etc/inc/globals.inc");
+require_once("guiconfig.inc");
 
-	Redistribution and use in source and binary forms, with or without
-	modification, are permitted provided that the following conditions are met:
-
-	1. Redistributions of source code MUST retain the above copyright notice,
-	   this list of conditions and the following disclaimer.
-
-	2. Redistributions in binary form must reproduce the above copyright
-	   notice, this list of conditions and the following disclaimer in the
-	   documentation and/or other materials provided with the distribution.
-
-	THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES,
-	INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY
-	AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
-	AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY,
-	OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-	SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-	INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-	CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-	ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-	POSSIBILITY OF SUCH DAMAGE.
-*/
+$pgtitle = array(gettext("Package"), gettext("Services: Postfix relay and antispam"), gettext("Queue"));
 $shortcut_section = "postfix";
-require("guiconfig.inc");
+
 
 $uname=posix_uname();
 if ($uname['machine']=='amd64')
         ini_set('memory_limit', '250M');
 
-$pfs_version = substr(trim(file_get_contents("/etc/version")),0,3);
-if ($pfs_version == "2.1" || $pfs_version == "2.2") {
-	define('POSTFIX_LOCALBASE', '/usr/pbi/postfix-' . php_uname("m"));
-} else {
-	define('POSTFIX_LOCALBASE','/usr/local');
+if ($savemsg) {
+        print_info_box($savemsg);
 }
-function get_cmd(){
+
+define('POSTFIX_LOCALBASE','/usr/local');
+
+if ($_REQUEST['cmd']!=""){
+	 ?>
+                <link rel="stylesheet" href="/vendor/datatable/css/jquery.dataTables.min.css">
+                <link rel="stylesheet" href="/vendor/datatable/Buttons-1.2.4/css/buttons.dataTables.min.css">
+                <script src="/vendor/jquery/jquery-1.12.0.min.js" type="text/javascript"></script>
+                <script src="/vendor/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/js/jquery.dataTables.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/Buttons-1.2.4/js/dataTables.buttons.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/JSZip-2.5.0/jszip.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/pdfmake-0.1.18/build/pdfmake.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/pdfmake-0.1.18/build/vfs_fonts.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/Buttons-1.2.4/js/buttons.html5.min.js" type="text/javascript"></script>
+                <script src="/vendor/datatable/ColReorder-1.3.2/js/dataTables.colReorder.min.js" type="text/javascript"></script>
+
+        <br/>
+	<?php
+
 	if ($_REQUEST['cmd'] =='mailq'){
 		#exec("/usr/local/bin/mailq" . escapeshellarg('^'.$m.$j." ".$hour.".*".$grep)." /var/log/maillog", $lists);
 		exec(POSTFIX_LOCALBASE."/bin/mailq", $mailq);
-		print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		print '<tr><td colspan="6" valign="top" class="listtopic">'.gettext($_REQUEST['cmd']." Results").'</td></tr>';
-		print '<tr><td class="listlr"><strong>SID</strong></td>';
-		print '<td class="listlr"><strong>size</strong></td>';
-		print '<td class="listlr"><strong>date</strong></td>';
-		print '<td class="listlr"><strong>sender</strong></td>';
-		print '<td class="listlr"><strong>info</strong></td>';
-		print '<td class="listlr"><strong>Recipient </strong></td></tr>';
-		#print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		$td='<td valign="top" class="listlr">';
+		print '<table id="dtresult" class="display" width="98%" border="0" cellpadding="8" cellspacing="0">';
+		$tss=array('thead','tfoot');
+		$dbc=array('SID','size','date','sender','info','Recipient');
+                foreach ($tss as $t){
+                        $$t = "<" . $t . "><tr>\n";
+                        foreach ($dbc as $c){
+                           $$t .= "<th>".ucfirst($c)."</th>";
+                        }
+                        $$t .= "</tr></" . $t . ">";
+                }
+                print "{$thead}\n<tbody>\n";
+
 		$sid="";
 		foreach ($mailq as $line){
+			if (preg_match("/Mail queue is empty",$line,$matches))
+				print "{$matches[1]}";
 			if(preg_match("/-Queue ID- --Size--/",$line,$matches))
 				print"";
 			elseif (preg_match("/(\w+)\s+(\d+)\s+(\w+\s+\w+\s+\d+\s+\d+:\d+:\d+)\s+(.*)/",$line,$matches)){
-				print '<tr>'.$td.$matches[1].'</td>'.$td.$matches[2].'</td>'.$td.$matches[3].'</td>'.$td.$matches[4];
+				print '<th>'.$td.$matches[1].'</th>'.$td.$matches[2].'</th>'.$td.$matches[3].'</th>'.$td.$matches[4];
 				$sid=$matches[1];
 				}
 			elseif (preg_match("/(\s+|)(\W\w+.*)/",$line,$matches) && $sid !="")
-				print $td.$matches[2].'</td>';
+				print $td.$matches[2].'</th>';
 			elseif (preg_match("/\s+(\w+.*)/",$line,$matches) && $sid !=""){
-				print $td.$matches[1].'</td></tr>';
+				print $td.$matches[1].'</th></tr>';
 				$sid="";
 			}
 		}
-		print '</table>';
+		//print '</table>';
+		print "</tbody>\n{$tfoot}\n</table>";
 	}
 	if ($_REQUEST['cmd'] =='qshape'){
 		if ($_REQUEST['qshape']!="")
 			exec(POSTFIX_LOCALBASE."/bin/qshape -".preg_replace("/\W/","",$_REQUEST['type'])." ". preg_replace("/\W/","",$_REQUEST['qshape']), $qshape);
 		else
 			exec(POSTFIX_LOCALBASE."/bin/qshape", $qshape);
-		print '<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">';
-		print '<tr><td colspan="12" valign="top" class="listtopic">'.gettext($_REQUEST['cmd']." Results").'</td></tr>';
-		$td='<td valign="top" class="listlr">';
+
+		print '<table id="dtresult" class="display" width="98%" border="0" cellpadding="8" cellspacing="0">';
 		$sid="";
 		foreach ($qshape as $line){
 			if (preg_match("/\s+(T\s.*)/",$line,$matches)){
-				print '<tr><td class="listlr"></td>';
+		                $dbc=explode (" ",preg_replace("/\s+/"," ",$matches[1]));
+				$tss=array('thead','tfoot');
+				
+                		foreach ($tss as $t){
+                        		$$t = "<" . $t . "><tr><th></th>\n";
+                        			foreach ($dbc as $c){
+							$$t .= "<th>{$c}</th>\n";
+                        				}
+                        		$$t .= "</tr></" . $t . ">";
+                		}
+                		print "{$thead}\n<tbody>\n";
+
+				/*
+				print "<tr>";
 				foreach (explode (" ",preg_replace("/\s+/"," ",$matches[1])) as $count)
-					print '<td class="listlr"><strong>'.$count.'</strong></td>';
-				print "</tr>";
+					print "<th>{$count}</th>";
+				print "</tr>";	
+				*/
 			}
 			else{
-				print "<tr>";
+				print "<tr>\n";
 				$line=preg_replace("/^\s+/","",$line);
 				$line=preg_replace("/\s+/"," ",$line);
 				foreach (explode (" ",$line) as $count)
-					print '<td class="listlr"><strong>'.$count.'</strong></td>';
-				print "</tr>";
+					print "<th>{$count}</th>\n";
+				print "</tr>\n";
 			}
 
 		}
 	}
+print "</tbody>\n{$tfoot}\n</table>";
+
+print <<<EOF
+<script>
+$(document).ready(function() {
+    $('#dtresult').DataTable({
+        scrollY:        '50vh',
+        scrollCollapse: true,
+        dom: 'Bfrtip',
+        colReorder: {
+            realtime: false
+        },
+        buttons: [
+            {
+                extend: 'copyHtml5',
+                exportOptions: {
+                 columns: ':contains("Office")'
+                }
+            },
+            'excelHtml5',
+            'csvHtml5',
+            'pdfHtml5'
+        ]
+        });
+} );
+</script>
+EOF;
+
+exit;
 }
 
-if ($_REQUEST['cmd']!=""){
-	get_cmd();
-	}
-else{
-	$pf_version=substr(trim(file_get_contents("/etc/version")),0,3);
-	if ($pf_version < 2.0)
-		$one_two = true;
+include("head.inc");
 
-	$pgtitle = "Status: Postfix Mail Queue";
-	include("head.inc");
-
-	?>
-	<body link="#0000CC" vlink="#0000CC" alink="#0000CC">
-	<?php include("fbegin.inc"); ?>
-
-	<?php if($one_two): ?>
-	<p class="pgtitle"><?=$pgtitle?></font></p>
-	<?php endif; ?>
-
-	<?php if ($savemsg) print_info_box($savemsg); ?>
+?>
 
 	<form action="postfix_view_config.php" method="post">
 
@@ -140,23 +184,32 @@ else{
 		$tab_array[] = array(gettext("About"), false, "/postfix_about.php");
 		display_top_tabs($tab_array);
 	?>
-			</td></tr>
-	 		<tr>
-	    		<td>
-					<div id="mainarea">
-						<table class="tabcont" width="100%" border="0" cellpadding="8" cellspacing="0">
-						<tr><td></td></tr>
-						<tr>
-						<td colspan="2" valign="top" class="listtopic"><?=gettext("Postfix Queue"); ?></td></tr>
-					<tr>
+<link rel="stylesheet" href="/vendor/datatable/css/jquery.dataTables.min.css">
+<script src="/vendor/jquery/jquery-1.12.0.min.js" type="text/javascript"></script>
+<script src="/vendor/bootstrap/js/bootstrap.min.js" type="text/javascript"></script>
+<script src="/vendor/datatable/js/jquery.dataTables.min.js" type="text/javascript"></script>
+<div class="panel panel-default">
+        <div class="panel-heading"><h2 class="panel-title"><?=gettext("Postfix Queue"); ?></h2></div>
+        <div class="panel-body">
+                <div class="table-responsive">
+                        <form id="paramsForm" name="paramsForm" method="post" action="">
+                        <table class="table table-hover table-condensed">
+                                <tbody>
+			<tr>
                         <td width="22%" valign="top" class="vncell"><?=gettext("queue command: ");?></td>
                         <td width="78%" class="vtable">
                         <select name="drop3" id="cmd">
                         	<option value="mailq" selected="selected">mailq</option>
                         	<option value="qshape" selected>qshape</option>
-						</select><br><?=gettext("Select queue command to run.");?></td>
-					</tr>
-					<tr>
+						</select>
+			<br/>
+			<span class="vexpl">
+			<?=gettext("Select queue command to run.");?>
+			</span>
+			</td>
+			</tr>
+			
+			<tr>
                         <td width="22%" valign="top" class="vncell"><?=gettext("update frequency: ");?></td>
                         <td width="78%" class="vtable">
                         <select name="drop3" id="updatef">
@@ -165,9 +218,15 @@ else{
 							<option value="30">30 Seconds</option>
 							<option value="60">One minute</option>
 							<option value="1" selected>Never</option>
-						</select><br><?=gettext("Select how often queue cmd will run.");?></td>
-					</tr>
-					<tr>
+						</select>
+			<br/>
+			<span class="vexpl">
+			<?=gettext("Select how often queue cmd will run.");?>
+			</span>
+			</td>
+			</tr>
+			
+			<tr>
                         <td width="22%" valign="top" class="vncell"><?=gettext("qshape Report flags: ");?></td>
                         <td width="78%" class="vtable">
                         <select name="drop3" id="qshape" multiple="multiple" size="5">
@@ -176,24 +235,36 @@ else{
 							<option value="active">active</option>
 							<option value="deferred">deferred</option>
 							<option value="maildrop">maildrop</option>
-						</select><br><?=gettext("Select how often queue will be queried.");?></td>
-					</tr>
-					<tr>
+						</select>
+			<br/>
+			<span class="vexpl">
+			<?=gettext("Select how often queue will be queried.");?>
+			</span>
+			</td>
+			</tr>
+			
+			<tr>
                         <td width="22%" valign="top" class="vncell"><?=gettext("qshape Report type: ");?></td>
                         <td width="78%" class="vtable">
                         <select name="drop3" id="qtype">
 							<option value="s" selected>sender domain</option>
 							<option value="p">parent domain</option>
-						</select><br><?=gettext("Select between sender or parent domains to order by.");?></td>
-					</tr>
-
-					<tr>
-							<td width="22%" valign="top"></td>
-                        <td width="78%"><input name="Submit" type="button" class="formbtn" id="run" value="<?=gettext("show queue");?>" onclick="get_queue('mailq')"><div id="search_help"></div></td>
-				</table>
-				</div>
-				</td>
+						</select>
+			<br/>
+			<span class="vexpl">
+			<?=gettext("Select between sender or parent domains to order by.");?>
+			</span>
+			</td>
 			</tr>
+
+			<tr>
+			<td width="22%" valign="top"></td>
+                        <td width="78%"><input name="Submit" type="button" class="formbtn" id="run" value="<?=gettext("show queue");?>" onclick="get_queue('mailq')"><div id="search_help"></div></td>
+			</table>
+			</div>
+			</td>
+			</tr>
+			
 			</table>
 			<br>
 				<div>
@@ -208,56 +279,72 @@ else{
 					</div>
 	</div>
 	</form>
-	<script type="text/javascript">
-	function loopSelected(id)
-	{
-	  var selectedArray = new Array();
-	  var selObj = document.getElementById(id);
-	  var i;
-	  var count = 0;
-	  for (i=0; i<selObj.options.length; i++) {
-	    if (selObj.options[i].selected) {
-	      selectedArray[count] = selObj.options[i].value;
-	      count++;
-	    }
-	  }
-	  return(selectedArray);
-	}
+<br/>
+        <div class="panel panel-default" style="margin-right:auto;margin-left:auto;width:95%;">
+        <div class="panel-body">
+        <div id="search_results" class="table-responsive">
+</div>
+</div>
+</div>
 
+	<script type="text/javascript">
 	function get_queue(loop) {
 			//prevent multiple instances
-			if ($('run').value=="show queue" || loop== 'running'){
-				$('run').value="running...";
-				$('search_help').innerHTML ="<br><strong>You can change options while running.<br>To Stop search, change update frequency to Never.</strong>";
-				var q_args=loopSelected('qshape');
-				var pars = 'cmd='+$('cmd').options[$('cmd').selectedIndex].value;
-				var pars = pars + '&qshape='+q_args;
-				var pars = pars + '&type='+$('qtype').options[$('qtype').selectedIndex].value;
+			if ($('#run').val()=="running..." && loop!= 'running'){
+			$('#updatef').val(1);
+			$('#run').val("show queue");
+			
+			}
+			if ($('#run').val()=="show queue" || loop== 'running'){
+				$('#run').val("running...");
+				$('#search_help').innerHTML ="<br><strong>You can change options while running.<br>To Stop search, change update frequency to Never.</strong>";
+				var q_args="";
+				$('#qshape').each(function () {
+                                        var sThisVal = (this.checked ? "1" : "0");
+                                        q_args += (q_args=="" ? $(this).val() : "," + $(this).val());
+                                        });
+				//var pars = 'cmd='+$('cmd').options[$('cmd').selectedIndex].value;
+				//var pars = pars + '&qshape='+q_args;
+				//var pars = pars + '&type='+$('qtype').options[$('qtype').selectedIndex].value;
 				var url = "/postfix_queue.php";
-				var myAjax = new Ajax.Request(
-					url,
-					{
-						method: 'post',
-						parameters: pars,
-						onComplete: activitycallback_queue_file
-					});
+				var $errors=0;
+				if ( q_args == "null" ){
+	                        	alert ("Please select at least one qshape Report flags.");
+					$('#updatef').val(1);
+                        		$('#run').val("show queue");
+        	        	        $errors++;
+                	       	 }
+				if ($errors === 0) {
+	                        jQuery.ajax(url,
+        	                        {
+                	                type: 'post',
+                        	        data: {
+						cmd:	$('#cmd').val(),
+                                	        qshape: q_args,
+						type:	$('#type').val(),
+                                	},
+                           	     success: function(ret){
+                                	        $('#search_results').html(ret);
+                                        	scroll(0,1100);
+						//$('#run').val("show queue");
+						//alert($('#updatef').val());
+						if($('#updatef').val() > 1){
+			                                setTimeout('get_queue("running")', $('#updatef').val() * 1000);
+                        			} else {
+							$('#run').val("show queue");
+						}
+
+                               		}
+                        	}
+                        	);
+
+                        	}
+
 				}
 			}
-		function activitycallback_queue_file(transport) {
-			$('file_div').innerHTML = transport.responseText;
-			var update=$('updatef').options[$('updatef').selectedIndex].value * 1000;
-			if (update > 1000){
-				setTimeout('get_queue("running")', update);
-				}
-			else{
-				$('run').value="show queue";
-				$('search_help').innerHTML ="";
-			}
-		}
 	</script>
 	<?php
 	include("fend.inc");
-	}
 	?>
 	</body>
 	</html>
